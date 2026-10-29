@@ -1,7 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
-        android:label="PwZ Hello">
+        android:label="PwZ App"
+        android:icon="@drawable/pwz_icon"
+        android:allowBackup="false">
         <activity
             android:name=".MainActivity"
             android:exported="true">
