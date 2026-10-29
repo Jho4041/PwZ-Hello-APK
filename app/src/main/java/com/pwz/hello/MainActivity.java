@@ -2,16 +2,26 @@ package com.pwz.hello;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.content.Intent;
+import android.graphics.Bitmap;
 import android.graphics.Color;
-import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.widget.Button;
 import android.widget.Toast;
 
+import com.google.mlkit.vision.barcode.common.Barcode;
+import com.google.android.gms.mlkit.vision.codescanner.GmsBarcodeScanner;
+import com.google.android.gms.mlkit.vision.codescanner.GmsBarcodeScanning;
+
 public class MainActivity extends Activity {
+
+    private static final int IMAGE_REQUEST = 1001;
+    private TextView resultText;
+    private ImageView imagePreview;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -19,52 +29,129 @@ public class MainActivity extends Activity {
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setGravity(Gravity.CENTER);
-        root.setPadding(28, 32, 28, 32);
+        root.setGravity(Gravity.CENTER_HORIZONTAL);
+        root.setPadding(24, 36, 24, 24);
         root.setBackgroundColor(Color.rgb(13, 29, 53));
 
-        TextView logo = new TextView(this);
-        logo.setText("PwZ");
-        logo.setTextSize(34);
-        logo.setTypeface(Typeface.DEFAULT_BOLD);
-        logo.setTextColor(Color.WHITE);
-        logo.setGravity(Gravity.CENTER);
-
-        GradientDrawable circle = new GradientDrawable();
-        circle.setShape(GradientDrawable.OVAL);
-        circle.setColor(Color.rgb(0, 150, 210));
-        logo.setBackground(circle);
-
-        LinearLayout.LayoutParams logoParams =
-            new LinearLayout.LayoutParams(120, 120);
-        logoParams.bottomMargin = 32;
-        root.addView(logo, logoParams);
-
         TextView title = new TextView(this);
-        title.setText("Welcome to PwZ App");
-        title.setTextSize(27);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setText("TindaPOS Scanner");
+        title.setTextSize(28);
         title.setTextColor(Color.WHITE);
         title.setGravity(Gravity.CENTER);
-        root.addView(title);
+        title.setPadding(0, 0, 0, 12);
+        root.addView(title, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView subtitle = new TextView(this);
-        subtitle.setText("Your first Android app, built with GitHub");
+        subtitle.setText("Scan products for your POS");
         subtitle.setTextSize(16);
         subtitle.setTextColor(Color.LTGRAY);
         subtitle.setGravity(Gravity.CENTER);
-        subtitle.setPadding(0, 16, 0, 32);
+        subtitle.setPadding(0, 0, 0, 28);
         root.addView(subtitle);
 
-        Button button = new Button(this);
-        button.setText("GET STARTED");
-        root.addView(button);
+        Button barcodeButton = new Button(this);
+        barcodeButton.setText("BARCODE SCANNER");
+        root.addView(barcodeButton, buttonParams());
 
-        button.setOnClickListener(v ->
-            Toast.makeText(this, "PwZ App is working!",
-                Toast.LENGTH_SHORT).show()
-        );
+        Button imageButton = new Button(this);
+        imageButton.setText("PRODUCT IMAGE SCANNER");
+        root.addView(imageButton, buttonParams());
+
+        resultText = new TextView(this);
+        resultText.setText("Ready to scan");
+        resultText.setTextSize(17);
+        resultText.setTextColor(Color.WHITE);
+        resultText.setGravity(Gravity.CENTER);
+        resultText.setPadding(0, 24, 0, 12);
+        root.addView(resultText);
+
+        imagePreview = new ImageView(this);
+        imagePreview.setAdjustViewBounds(true);
+        imagePreview.setScaleType(ImageView.ScaleType.FIT_CENTER);
+
+        LinearLayout.LayoutParams imageParams =
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, 360);
+        imageParams.topMargin = 12;
+        root.addView(imagePreview, imageParams);
+
+        barcodeButton.setOnClickListener(v -> scanBarcode());
+        imageButton.setOnClickListener(v -> takeProductPhoto());
 
         setContentView(root);
+    }
+
+    private LinearLayout.LayoutParams buttonParams() {
+        LinearLayout.LayoutParams params =
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, 8, 0, 8);
+        return params;
+    }
+
+    private void scanBarcode() {
+        resultText.setText("Opening barcode scanner...");
+
+        GmsBarcodeScanner scanner =
+                GmsBarcodeScanning.getClient(this);
+
+        scanner.startScan()
+                .addOnSuccessListener(barcode -> {
+                    String value = barcode.getRawValue();
+
+                    if (value != null && !value.isEmpty()) {
+                        resultText.setText(
+                                "Scanned barcode:\n" + value +
+                                "\n\nProduct lookup is not connected yet.");
+                    } else {
+                        resultText.setText("No barcode value found.");
+                    }
+                })
+                .addOnCanceledListener(() ->
+                        resultText.setText("Barcode scan cancelled."))
+                .addOnFailureListener(error -> {
+                    resultText.setText("Scanner could not start.");
+                    Toast.makeText(this,
+                            error.getLocalizedMessage() != null
+                                    ? error.getLocalizedMessage()
+                                    : "Check Google Play services",
+                            Toast.LENGTH_LONG).show();
+                });
+    }
+
+    private void takeProductPhoto() {
+        Intent intent =
+                new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+
+        if (intent.resolveActivity(getPackageManager()) != null) {
+            startActivityForResult(intent, IMAGE_REQUEST);
+        } else {
+            Toast.makeText(this,
+                    "No camera app is available",
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(
+            int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == IMAGE_REQUEST &&
+                resultCode == Activity.RESULT_OK &&
+                data != null && data.getExtras() != null) {
+
+            Object photo = data.getExtras().get("data");
+
+            if (photo instanceof Bitmap) {
+                imagePreview.setImageBitmap((Bitmap) photo);
+                resultText.setText(
+                        "Product photo captured.\n" +
+                        "Inventory image matching is not connected yet.");
+            }
+        }
     }
 }
